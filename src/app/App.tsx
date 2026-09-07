@@ -557,6 +557,8 @@ function AttendanceDetailPage({ sessionId, sessions, players, setPlayers, attend
   const session = sessions.find(s=>s.id===sessionId);
   const [showModal,setShowModal] = useState(false);
   const [np,setNp] = useState<Partial<Player>>({});
+  const [editingPlayer,setEditingPlayer] = useState<Player|null>(null);
+  const [ep,setEp] = useState<Partial<Player>>({});
 
   function getStatus(pid:string){ return attendance.find(r=>r.sessionId===sessionId&&r.playerId===pid)?.status??null; }
   function setStatus(pid:string,status:AttendanceStatus){
@@ -566,6 +568,17 @@ function AttendanceDetailPage({ sessionId, sessions, players, setPlayers, attend
     if(!np.firstName||!np.lastName) return;
     setPlayers(prev=>[...prev,{id:uid(),cipa:np.cipa??"",shirtNumber:np.shirtNumber??0,firstName:np.firstName!,lastName:np.lastName!,nickname:np.nickname??"",isGoalkeeper:np.isGoalkeeper??false}]);
     setNp({}); setShowModal(false);
+  }
+  function openEdit(p:Player){ setEditingPlayer(p); setEp({...p}); }
+  function saveEdit(){
+    if(!ep.firstName||!ep.lastName||!editingPlayer) return;
+    setPlayers(prev=>prev.map(p=>p.id===editingPlayer.id?{...p,...ep,firstName:ep.firstName!,lastName:ep.lastName!}:p));
+    setEditingPlayer(null); setEp({});
+  }
+  function deletePlayer(pid:string){
+    setPlayers(prev=>prev.filter(p=>p.id!==pid));
+    setAttendance(prev=>prev.filter(r=>r.playerId!==pid));
+    setEditingPlayer(null); setEp({});
   }
 
   const counts = useMemo(()=>{
@@ -627,6 +640,10 @@ function AttendanceDetailPage({ sessionId, sessions, players, setPlayers, attend
                     </button>
                   );
                 })}
+                <button onClick={()=>openEdit(p)} title="Editar jogador"
+                  className="w-9 h-9 rounded-lg border border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground flex items-center justify-center transition-all active:scale-90">
+                  <Edit2 size={13}/>
+                </button>
               </div>
             </div>
           );
@@ -664,6 +681,47 @@ function AttendanceDetailPage({ sessionId, sessions, players, setPlayers, attend
             <button onClick={addPlayer} className="w-full mt-5 bg-primary text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-primary/90 transition-colors">
               Adicionar Jogador
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit player modal */}
+      {editingPlayer&&(
+        <div className="fixed inset-0 bg-black/75 flex items-end justify-center z-50" onClick={()=>setEditingPlayer(null)}>
+          <div className="bg-card border border-border rounded-t-3xl p-6 w-full max-h-[80vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg" style={{fontFamily:"'Barlow Condensed',sans-serif"}}>Editar Jogador</h3>
+              <button onClick={()=>setEditingPlayer(null)}><X size={20}/></button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-muted-foreground block mb-1.5">Primeiro Nome *</label>
+                  <input className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm w-full text-foreground" value={ep.firstName??""} onChange={e=>setEp(p=>({...p,firstName:e.target.value}))}/></div>
+                <div><label className="text-xs text-muted-foreground block mb-1.5">Último Nome *</label>
+                  <input className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm w-full text-foreground" value={ep.lastName??""} onChange={e=>setEp(p=>({...p,lastName:e.target.value}))}/></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-muted-foreground block mb-1.5">Alcunha</label>
+                  <input className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm w-full text-foreground" value={ep.nickname??""} onChange={e=>setEp(p=>({...p,nickname:e.target.value}))}/></div>
+                <div><label className="text-xs text-muted-foreground block mb-1.5">N.º Camisola</label>
+                  <input type="number" className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm w-full text-foreground" value={ep.shirtNumber??""} onChange={e=>setEp(p=>({...p,shirtNumber:parseInt(e.target.value)}))}/></div>
+              </div>
+              <div><label className="text-xs text-muted-foreground block mb-1.5">CIPA</label>
+                <input className="bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm w-full text-foreground" value={ep.cipa??""} onChange={e=>setEp(p=>({...p,cipa:e.target.value}))}/></div>
+              <label className="flex items-center gap-3 text-sm cursor-pointer py-1">
+                <input type="checkbox" checked={ep.isGoalkeeper??false} onChange={e=>setEp(p=>({...p,isGoalkeeper:e.target.checked}))} className="w-5 h-5 accent-primary rounded"/>
+                Guarda-Redes
+              </label>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={()=>deletePlayer(editingPlayer.id)}
+                className="flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-2xl border border-destructive/40 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors">
+                <Trash2 size={15}/> Remover
+              </button>
+              <button onClick={saveEdit} className="flex-1 bg-primary text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-primary/90 transition-colors">
+                Guardar Alterações
+              </button>
+            </div>
           </div>
         </div>
       )}
