@@ -1,4 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import clubLogo from "@/imports/FC-Infesta-Louros.png";
 import {
   Activity, Users, BarChart3, Trophy,
   ChevronLeft, ChevronRight, Plus, Clock, MapPin,
@@ -8,6 +10,20 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+
+// ── API ────────────────────────────────────────────────────────────────────────
+
+const API = "https://icdqeecsmpvxwdajgisd.supabase.co/functions/v1/make-server-8a2c2059";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljZHFlZWNzbXB2eHdkYWpnaXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3OTM0NTksImV4cCI6MjEwNDM2OTQ1OX0.zV77ENnMkqapGDwV6TvlSFIkrC9Cj6avPGM5FNcTp6I";
+const HEADERS = { "Content-Type": "application/json", "Authorization": `Bearer ${ANON_KEY}` };
+
+async function apiFetch(path: string) {
+  const r = await fetch(`${API}${path}`, { headers: HEADERS });
+  return r.json();
+}
+async function apiSave(path: string, data: unknown) {
+  await fetch(`${API}${path}`, { method: "PUT", headers: HEADERS, body: JSON.stringify(data) });
+}
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 
@@ -213,30 +229,38 @@ function HomePage({ sessions, players, attendance, games, push }: {
   return (
     <div className="min-h-screen bg-background flex flex-col p-5 pb-10">
       {/* Hero */}
-      <div className="pt-10 pb-8">
-        <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{boxShadow:"0 0 24px rgba(249,115,22,0.35)"}}>
-          <span className="text-white font-black text-2xl" style={{fontFamily:"'Barlow Condensed',sans-serif"}}>A</span>
+      <div className="pt-10 pb-8 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Época 2026/27</p>
+          <h1 className="text-4xl font-black" style={{fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.02em"}}>AndebolPro</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestão de Equipa</p>
         </div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Época 2026/27</p>
-        <h1 className="text-4xl font-black" style={{fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.02em"}}>AndebolPro</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestão de Equipa</p>
+        <ImageWithFallback
+          src={clubLogo}
+          alt="FC Infesta"
+          className="w-28 h-28 object-contain flex-shrink-0"
+        />
       </div>
 
-      {/* 2×2 Grid */}
-      <div className="grid grid-cols-2 gap-3 flex-1">
+      {/* Vertical list */}
+      <div className="flex flex-col gap-2 flex-1">
         {cards.map((c,i) => {
           const Icon = c.icon;
           return (
             <button key={i} onClick={()=>push(c.page)}
-              className="bg-card border border-border rounded-2xl p-5 text-left flex flex-col gap-4 active:scale-95 transition-all hover:border-border/60"
-              style={{minHeight:"140px"}}>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{backgroundColor:c.bg}}>
-                <Icon size={24} style={{color:c.color}}/>
+              className="w-full bg-card border border-border rounded-2xl flex items-center gap-4 px-4 active:scale-[0.98] active:bg-secondary/60 transition-all"
+              style={{minHeight:"72px"}}>
+              {/* Colored icon */}
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{backgroundColor:c.bg}}>
+                <Icon size={22} style={{color:c.color}}/>
               </div>
-              <div>
-                <div className="font-bold leading-tight mb-0.5" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"1.05rem"}}>{c.label}</div>
-                <div className="text-xs text-muted-foreground leading-snug">{c.sub}</div>
+              {/* Labels */}
+              <div className="flex-1 text-left py-4">
+                <div className="font-bold leading-tight" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"1.1rem"}}>{c.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{c.sub}</div>
               </div>
+              {/* Chevron */}
+              <ChevronRight size={18} className="text-muted-foreground flex-shrink-0"/>
             </button>
           );
         })}
@@ -1081,10 +1105,63 @@ export default function App() {
   const [players,setPlayers]       = useState<Player[]>(INITIAL_PLAYERS);
   const [attendance,setAttendance] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
   const [games,setGames]           = useState<Game[]>(INITIAL_GAMES);
+  const [loading,setLoading]       = useState(true);
+  const initialized                = useRef(false);
+
+  // Load data on mount
+  useEffect(() => {
+    async function load() {
+      try {
+        const [s,p,a,g] = await Promise.all([
+          apiFetch("/sessions"),
+          apiFetch("/players"),
+          apiFetch("/attendance"),
+          apiFetch("/games"),
+        ]);
+        setSessions(Array.isArray(s) ? s : INITIAL_SESSIONS);
+        setPlayers(Array.isArray(p) ? p : INITIAL_PLAYERS);
+        setAttendance(Array.isArray(a) ? a : INITIAL_ATTENDANCE);
+        setGames(Array.isArray(g) ? g : INITIAL_GAMES);
+        // Seed DB if empty
+        if (!Array.isArray(s)) apiSave("/sessions",   INITIAL_SESSIONS);
+        if (!Array.isArray(p)) apiSave("/players",    INITIAL_PLAYERS);
+        if (!Array.isArray(a)) apiSave("/attendance", INITIAL_ATTENDANCE);
+        if (!Array.isArray(g)) apiSave("/games",      INITIAL_GAMES);
+      } catch {
+        setSessions(INITIAL_SESSIONS);
+        setPlayers(INITIAL_PLAYERS);
+        setAttendance(INITIAL_ATTENDANCE);
+        setGames(INITIAL_GAMES);
+      } finally {
+        initialized.current = true;
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  // Auto-save whenever data changes
+  useEffect(() => { if (initialized.current) apiSave("/sessions",   sessions);   }, [sessions]);
+  useEffect(() => { if (initialized.current) apiSave("/players",    players);    }, [players]);
+  useEffect(() => { if (initialized.current) apiSave("/attendance", attendance); }, [attendance]);
+  useEffect(() => { if (initialized.current) apiSave("/games",      games);      }, [games]);
 
   const page = stack[stack.length-1];
   const push = (p:Page) => setStack(s=>[...s,p]);
   const pop  = () => setStack(s=>s.length>1?s.slice(0,-1):s);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4 mx-auto" style={{boxShadow:"0 0 32px rgba(249,115,22,0.4)",animation:"pulse 2s infinite"}}>
+            <span className="text-white font-black text-3xl" style={{fontFamily:"'Barlow Condensed',sans-serif"}}>A</span>
+          </div>
+          <p className="text-sm text-muted-foreground animate-pulse">A carregar dados…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden" style={{fontFamily:"'Inter',sans-serif"}}>
